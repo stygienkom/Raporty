@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Raportów v31</title>
+    <style>
+        :root {
+            --bg-body: #f1f5f9;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --vehicle-card: #ffffff;
+            --issue-card: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success: #10b981;
+            --danger: #ef4444;
+            --summary-bg: #1e293b;
+        }
+
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            background: var(--bg-body); 
+            padding: 10px; 
+            color: var(--text-main); 
+            line-height: 1.5;
+            margin: 0;
+        }
+        
+        .container { max-width: 850px; margin: 0 auto; padding-top: 10px; }
+
+        /* Nowe dopasowane Podsumowanie Godzin */
+        .live-summary {
+            background: var(--summary-bg);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .live-summary h3 { 
+            margin: 0; 
+            font-size: 0.75rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            color: #94a3b8;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 5px;
+        }
+        #workerStatsContent {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .live-summary-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 2px 0; }
+        .live-total { 
+            grid-column: 1 / -1;
+            margin-top: 5px; 
+            padding-top: 5px; 
+            border-top: 1px solid #334155; 
+            font-weight: 800; 
+            color: var(--success); 
+            font-size: 1rem;
+            text-align: right;
+        }
+
+        /* Karty */
+        .vehicle-card { background: var(--vehicle-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .issue-card { background: var(--issue-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        
+        .issue-grid {
+            display: flex; 
+            gap: 12px; 
+            align-items: flex-end; 
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .category-box { flex-grow: 1; } 
+        .time-box { width: 70px; flex-shrink: 0; } 
+
+        label { display: block; font-weight: 600; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        
+        .issue-grid select, .issue-grid input { width: 100%; box-sizing: border-box; }
+
+        select, input, textarea { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: white; font-size: 0.9rem; transition: border 0.2s; }
+        textarea { width: 100%; box-sizing: border-box; }
+        select:focus, input:focus { outline: none; border-color: var(--primary); }
+
+        /* Pracownicy i Tagi */
+        .worker-container { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .worker-tag { background: #eef2ff; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; border: 1px solid #c7d2fe; color: var(--primary); font-weight: 500; }
+        
+        /* Przyciski */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        .btn-add-v { background: var(--primary); color: white; width: 100%; margin-bottom: 20px; padding: 12px; }
+        .btn-add-i { background: #f1f5f9; color: var(--text-muted); border: 1px dashed var(--border-color); }
+        .btn-rem { background: transparent; color: var(--danger); font-size: 0.75rem; height: 38px; }
+        .btn-gen { background: var(--success); color: white; width: 100%; padding: 14px; margin-top: 15px; }
+        .btn-copy { background: var(--primary); color: white; width: 100%; padding: 14px; margin-top: 10px; }
+
+        #reportOutput { background: white; padding: 30px; margin-top: 25px; display: none; border-radius: 12px; border: 2px solid #000; color: #000; }
+        .photo-preview { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+
+        @media print { .no-print { display: none; } #reportOutput { display: block !important; border: none; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="no-print">
+        <div class="live-summary" id="liveSummary">
+            <h3>📊 Podsumowanie godzin pracy</h3>
+            <div id="workerStatsContent"></div>
+        </div>
+
+        <div id="vehicleContainer"></div>
+        
+        <button class="btn btn-add-v" onclick="addVehicle()">+ Dodaj nowy pojazd</button>
+        <button class="btn btn-gen" onclick="generateReport()">📄 Generuj raport końcowy</button>
+    </div>
+
+    <div id="reportOutput"></div>
+
+    <div class="no-print" id="actionButtons" style="display:none;">
+        <button class="btn btn-copy" onclick="copyToClipboard()">📋 Kopiuj tekst do schowka</button>
+    </div>
+
+    <button class="btn btn-reset no-print" onclick="resetForm()" style="margin-top: 40px; opacity: 0.4; border:none; background:none; cursor:pointer; width:100%; color:var(--text-muted); font-size: 0.75rem;">WYCZYŚĆ WSZYSTKO (RESET)</button>
+</div>
+
+<script>
+    const WORKERS_LIST = ["Mirosław Stygienko", "Jacek Grub", "Piotr Zieliński", "Dominik Czekaj"];
+    const CATEGORIES = ["CHECKLISTA:", "AWIA:", "NAPRAWA:", "INNE:"];
+    
+    const VEHICLES_LIST = [];
+    for (let i = 25; i <= 48; i++) VEHICLES_LIST.push(`48WEc-${i.toString().padStart(3, '0')}`);
+    for (let i = 53; i <= 60; i++) VEHICLES_LIST.push(`48WEc-${i.toString().padStart(3, '0')}`);
+
+    let photoData = {}; 
+
+    function saveToLocal() {
+        const data = [];
+        document.querySelectorAll('.vehicle-card').forEach(v => {
+            const vData = { number: v.querySelector('.v-number').value, issues: [] };
+            v.querySelectorAll('.issue-card').forEach(iss => {
+                const iData = { 
+                    category: iss.querySelector('.i-category').value, 
+                    desc: iss.querySelector('.i-desc').value, 
+                    time: iss.querySelector('.i-time').value,
+                    workers: [] 
+                };
+                iss.querySelectorAll('.w-name').forEach(sel => { iData.workers.push(sel.value); });
+                vData.issues.push(iData);
+            });
+            data.push(vData);
+        });
+        localStorage.setItem('serwisData', JSON.stringify(data));
+        updateLiveSummary();
+    }
+
+    function loadFromLocal() {
+        const saved = localStorage.getItem('serwisData');
+        if (!saved) { addVehicle(); return; }
+        const data = JSON.parse(saved);
+        data.forEach(vData => {
+            const vId = createVehicleUI(vData.number);
+            vData.issues.forEach(iData => {
+                const iId = createIssueUI(vId, iData.category, iData.desc, iData.time);
+                iData.workers.forEach(wName => { createWorkerUI(iId, wName); });
+            });
+        });
+        updateLiveSummary();
+    }
+
+    function createVehicleUI(val = "48WEc-025") {
+        const vId = `v-${Date.now()}-${Math.random()}`;
+        const vOptions = VEHICLES_LIST.map(v => `<option value="${v}" ${val===v?'selected':''}>${v}</option>`).join('');
+        document.getElementById('vehicleContainer').insertAdjacentHTML('beforeend', `
+            <div class="vehicle-card" id="${vId}">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div style="width:60%"><label>Pojazd</label><select class="v-number" onchange="saveToLocal()">${vOptions}</select></div>
+                    <button class="btn btn-rem" onclick="document.getElementById('${vId}').remove(); saveToLocal();">Usuń pojazd</button>
+                </div>
+                <div id="issues-${vId}"></div>
+                <button class="btn btn-add-i" onclick="addIssue('${vId}')">+ Dodaj czynność</button>
+            </div>
+        `);
+        return vId;
+    }
+
+    function createIssueUI(vId, cat = "CHECKLISTA:", desc = "", time = "0.5") {
+        const iId = `i-${Date.now()}-${Math.random()}`;
+        const catOptions = CATEGORIES.map(c => `<option ${cat===c?'selected':''}>${c}</option>`).join('');
+        document.getElementById(`issues-${vId}`).insertAdjacentHTML('beforeend', `
+            <div class="issue-card" id="${iId}">
+                <div class="issue-grid">
+                    <div class="category-box"><label>Kategoria</label><select class="i-category" onchange="saveToLocal()">${catOptions}</select></div>
+                    <div class="time-box"><label>Czas</label><input type="number" class="i-time" step="0.5" value="${time}" oninput="saveToLocal()"></div>
+                    <button class="btn btn-rem" onclick="document.getElementById('${iId}').remove(); saveToLocal();">Usuń</button>
+                </div>
+                <label>Opis czynności</label>
+                <textarea class="i-desc" rows="2" placeholder="Opis prac..." oninput="saveToLocal()">${desc}</textarea>
+                <div id="workers-${iId}" class="worker-container"></div>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button class="btn btn-add-w" onclick="addWorker('${iId}')" style="background:white; border:1px solid #ddd; padding:4px 8px; border-radius:6px; font-size:0.75rem;">👤 Osoba</button>
+                    <button class="btn btn-add-w" style="background:white; border:1px dashed #ddd; padding:4px 8px; border-radius:6px; font-size:0.75rem;" onclick="document.getElementById('file-${iId}').click()">📷 Foto</button>
+                </div>
+                <input type="file" id="file-${iId}" style="display:none" accept="image/*" multiple onchange="handleFiles(this, '${iId}')">
+                <div class="photo-preview" id="preview-${iId}"></div>
+            </div>
+        `);
+        return iId;
+    }
+
+    function createWorkerUI(iId, name = WORKERS_LIST[0]) {
+        const wId = `w-${Date.now()}-${Math.random()}`;
+        const options = WORKERS_LIST.map(w => `<option value="${w}" ${name===w?'selected':''}>${w}</option>`).join('');
+        document.getElementById(`workers-${iId}`).insertAdjacentHTML('beforeend', `
+            <div class="worker-tag" id="${wId}">
+                <select class="w-name" style="width:auto; border:none; background:none; padding:0; font-size:inherit; color:inherit; cursor:pointer;" onchange="saveToLocal()">${options}</select>
+                <span style="cursor:pointer; color:var(--danger);" onclick="document.getElementById('${wId}').remove(); saveToLocal();">×</span>
+            </div>
+        `);
+    }
+
+    function addVehicle() { const vId = createVehicleUI(); addIssue(vId); saveToLocal(); }
+    function addIssue(vId) { const iId = createIssueUI(vId); addWorker(iId); saveToLocal(); }
+    function addWorker(iId) { createWorkerUI(iId); saveToLocal(); }
+    function resetForm() { if(confirm("Wyczyścić wszystko?")) { localStorage.removeItem('serwisData'); location.reload(); } }
+
+    function updateLiveSummary() {
+        let stats = {};
+        let total = 0;
+        document.querySelectorAll('.issue-card').forEach(iss => {
+            const time = parseFloat(iss.querySelector('.i-time').value) || 0;
+            iss.querySelectorAll('.w-name').forEach(w => {
+                const name = w.value;
+                stats[name] = (stats[name] || 0) + time;
+                total += time;
+            });
+        });
+        let html = "";
+        for (let name in stats) { html += `<div class="live-summary-row"><span>${name}</span><span>${stats[name]} h</span></div>`; }
+        if(total === 0) html = "<div style='color:#94a3b8; font-size:0.75rem;'>Brak danych</div>";
+        else html += `<div class="live-total">ŁĄCZNIE: ${total} h</div>`;
+        document.getElementById('workerStatsContent').innerHTML = html;
+    }
+
+    function handleFiles(input, iId) {
+        if (!photoData[iId]) photoData[iId] = [];
+        Array.from(input.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                photoData[iId].push(e.target.result);
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.style = "width:40px; height:40px; object-fit:cover; border-radius:4px;";
+                document.getElementById(`preview-${iId}`).appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function generateReport() {
+        const vehicles = document.querySelectorAll('.vehicle-card');
+        const output = document.getElementById('reportOutput');
+        let reportHtml = ""; 
+        vehicles.forEach(v => {
+            const vNum = v.querySelector('.v-number').value;
+            reportHtml += `<div style="font-size: 1.4rem; margin-top: 25px; margin-bottom: 10px; font-weight: bold;">Numer pojazdu: ${vNum}</div>`;
+            v.querySelectorAll('.issue-card').forEach((iss) => {
+                const time = iss.querySelector('.i-time').value;
+                const workers = Array.from(iss.querySelectorAll('.w-name')).map(w => w.value).join(', ');
+                const imgs = (photoData[iss.id] || []).map(src => `<img src="${src}" style="max-width: 400px; display: block; margin: 15px 0 0 45px; border: 1px solid #ccc;">`).join('');
+                reportHtml += `<div style="margin-bottom: 35px;">
+                    <div style="font-size: 1.1rem; margin: 10px 0 5px 20px; font-weight: bold;">${iss.querySelector('.i-category').value}</div>
+                    <div style="margin-left: 45px; margin-bottom: 4px;">${iss.querySelector('.i-desc').value}</div>
+                    <div style="margin-left: 45px; font-size: 0.95rem; margin-bottom: 10px;">${workers} ${time}h</div>
+                    ${imgs}
+                </div>`;
+            });
+        });
+        output.innerHTML = reportHtml;
+        output.style.display = 'block';
+        document.getElementById('actionButtons').style.display = 'block';
+        output.scrollIntoView({behavior: "smooth"});
+    }
+
+    function copyToClipboard() {
+        let text = ""; 
+        document.querySelectorAll('.vehicle-card').forEach(v => {
+            text += `Numer pojazdu: ${v.querySelector('.v-number').value}\n`;
+            v.querySelectorAll('.issue-card').forEach((iss) => {
+                const time = iss.querySelector('.i-time').value;
+                const workers = Array.from(iss.querySelectorAll('.w-name')).map(w => w.value).join(', ');
+                text += `   ${iss.querySelector('.i-category').value}\n      ${iss.querySelector('.i-desc').value}\n      ${workers} ${time}h\n\n`;
+            });
+            text += "\n";
+        });
+        navigator.clipboard.writeText(text).then(() => alert("Skopiowano do schowka!"));
+    }
+
+    window.onload = loadFromLocal;
+</script>
+</body>
+</html>
