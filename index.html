@@ -1,4 +1,3 @@
-</html>
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -232,7 +231,6 @@
 </div>
 
 <script>
-    // Zaktualizowana lista pracowników
     const WORKERS = ["Mirosław Stygienko", "Jacek Grub", "Maciej Myszkowski", "Dominik Czekaj", "Grzegorz Zalewski", "Borys Zelenskyi", "Waldemar Kowaliński"];
     const CATEGORIES = ["CHECKLISTA", "AWIA", "NAPRAWA", "REKLAMACJA", "DYSPOZYTOR", "WERYFIKACJA STANU TECHNICZNEGO", "INNE"];
     
@@ -251,7 +249,11 @@
     function saveToLocal() {
         const data = [];
         document.querySelectorAll('.vehicle-card').forEach(v => {
-            const vData = { number: v.querySelector('.v-number').value, issues: [] };
+            const vData = { 
+                number: v.querySelector('.v-number').value, 
+                km: v.querySelector('.v-km').value,
+                issues: [] 
+            };
             v.querySelectorAll('.issue-card').forEach(iss => {
                 const iData = {
                     cat: iss.querySelector('.i-category').value,
@@ -276,7 +278,7 @@
         const saved = localStorage.getItem('serwisV43_data');
         if(!saved) { addVehicle(); return; }
         JSON.parse(saved).forEach(vData => {
-            const vId = createVehicleUI(vData.number);
+            const vId = createVehicleUI(vData.number, vData.km);
             vData.issues.forEach(iData => {
                 const iId = createIssueUI(vId, iData.cat, iData.desc, iData.time);
                 iData.workers.forEach(w => createWorkerUI(iId, w));
@@ -296,13 +298,14 @@
         updateSummary();
     }
 
-    function createVehicleUI(val) {
+    function createVehicleUI(val, kmVal) {
         const id = `v${Date.now()}${Math.random().toString(36).substr(2, 5)}`;
         document.getElementById('vehicleContainer').insertAdjacentHTML('beforeend', `
             <div class="vehicle-card" id="${id}">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <div style="width:60%"><label>Numer Pojazdu</label><select class="v-number" onchange="saveToLocal()">${VEHICLES.map(v=>`<option ${val===v?'selected':''}>${v}</option>`).join('')}</select></div>
-                    <button class="btn btn-rem" onclick="if(confirm('Usunąć pojazd?')) { document.getElementById('${id}').remove(); saveToLocal(); }">USUŃ POJAZD</button>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:15px; margin-bottom:20px;">
+                    <div style="flex-grow:2"><label>Numer Pojazdu</label><select class="v-number" onchange="saveToLocal()">${VEHICLES.map(v=>`<option ${val===v?'selected':''}>${v}</option>`).join('')}</select></div>
+                    <div style="flex-grow:1"><label>Kilometry</label><input type="text" class="v-km" placeholder="np. 120500" value="${kmVal||''}" oninput="saveToLocal()"></div>
+                    <button class="btn btn-rem" onclick="if(confirm('Usunąć pojazd?')) { document.getElementById('${id}').remove(); saveToLocal(); }">USUŃ</button>
                 </div>
                 <div id="iss-${id}"></div>
                 <button class="btn" style="background:#f1f5f9; color:#475569; width:100%; border:2px dashed #cbd5e1" onclick="addIssue('${id}')">+ Dodaj czynność serwisową</button>
@@ -389,7 +392,12 @@
         const output = document.getElementById('reportOutput');
         let h = "";
         document.querySelectorAll('.vehicle-card').forEach(v => {
-            h += `<div style="margin-bottom:10px; font-weight:bold;">Pojazd: ${v.querySelector('.v-number').value}</div>`;
+            const vNum = v.querySelector('.v-number').value;
+            const vKm = v.querySelector('.v-km').value;
+            const kmDisplay = vKm ? ` (${vKm} km)` : "";
+            
+            h += `<div style="margin-bottom:10px; font-weight:bold;">Pojazd: ${vNum}${kmDisplay}</div>`;
+            
             v.querySelectorAll('.issue-card').forEach(iss => {
                 const catValue = iss.querySelector('.i-category').value;
                 const desc = iss.querySelector('.i-desc').value;
